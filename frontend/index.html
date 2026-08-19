@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid Guardian</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #131a22;
+    --border: #223040;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --critical: #ff4d4f;
+    --high: #ff9f43;
+    --medium: #f5d90a;
+    --low: #4caf50;
+    --accent: #3fa9f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header h1 span { color: var(--accent); }
+  #status { font-size: 12px; color: var(--muted); }
+  #layout {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    grid-template-rows: 60vh auto;
+    gap: 1px;
+    background: var(--border);
+  }
+  #map { width: 100%; height: 60vh; background: var(--panel); }
+  #briefing {
+    background: var(--panel);
+    padding: 16px 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+  }
+  #briefing h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
+  #briefing-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  #table-wrap {
+    grid-column: 1 / 3;
+    background: var(--panel);
+    padding: 16px 20px;
+  }
+  #table-wrap h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .risk-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; width: 100px; }
+  .risk-bar-fill { height: 100%; }
+  .crit-critical { color: var(--critical); }
+  .crit-high { color: var(--high); }
+  .crit-medium { color: var(--medium); }
+  .crit-low { color: var(--low); }
+  #refresh-btn {
+    background: var(--accent);
+    color: #05131f;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .leaflet-popup-content-wrapper { background: var(--panel); color: var(--text); }
+  .leaflet-popup-tip { background: var(--panel); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Grid <span>Guardian</span> — Critical Infrastructure Risk Monitor</h1>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span id="status">Loading live hazard data…</span>
+    <button id="refresh-btn" onclick="loadAll()">Refresh</button>
+  </div>
+</header>
+
+<div id="layout">
+  <div id="map"></div>
+  <div id="briefing">
+    <h2>Ops Briefing</h2>
+    <div id="briefing-text">Waiting for data…</div>
+  </div>
+  <div id="table-wrap">
+    <h2>Asset Risk Table</h2>
+    <table>
+      <thead>
+        <tr><th>Asset</th><th>Type</th><th>Criticality</th><th>Risk Score</th><th>Top Hazard</th></tr>
+      </thead>
+      <tbody id="risk-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API_BASE = "";
+const map = L.map('map', { zoomControl: true }).setView([36.5, -100], 4);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  maxZoom: 19,
+}).addTo(map);
+
+let markers = [];
+
+function riskColor(score) {
+  if (score >= 0.5) return '#ff4d4f';
+  if (score >= 0.2) return '#ff9f43';
+  if (score > 0) return '#f5d90a';
+  return '#4caf50';
+}
+
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+function renderMap(assets) {
+  clearMarkers();
+  assets.forEach(a => {
+    const color = riskColor(a.risk_score);
+    const marker = L.circleMarker([a.lat, a.lon], {
+      radius: 7 + a.risk_score * 10,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.6,
+      weight: 2,
+    }).addTo(map);
+    const hazardLines = a.hazards.slice(0, 3).map(h =>
+      `<div style="margin-top:4px;font-size:12px;color:#8b98a5;">${h.event_type} (${h.severity}) — ${h.headline}</div>`
+    ).join('');
+    marker.bindPopup(
+      `<b>${a.name}</b><br/>${a.type} · ${a.criticality}<br/>Risk score: <b>${a.risk_score}</b>${hazardLines}`
+    );
+    markers.push(marker);
+  });
+}
+
+function renderTable(assets) {
+  const tbody = document.getElementById('risk-tbody');
+  tbody.innerHTML = '';
+  assets.forEach(a => {
+    const topHazard = a.hazards[0] ? `${a.hazards[0].event_type} — ${a.hazards[0].headline}` : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${a.name}</td>
+      <td>${a.type}</td>
+      <td class="crit-${a.criticality}">${a.criticality}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="risk-bar"><div class="risk-bar-fill" style="width:${Math.min(a.risk_score * 100, 100)}%; background:${riskColor(a.risk_score)};"></div></div>
+          <span>${a.risk_score}</span>
+        </div>
+      </td>
+      <td style="color:#8b98a5; font-size:12px;">${topHazard}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadAll() {
+  document.getElementById('status').textContent = 'Refreshing…';
+  try {
+    const riskResp = await fetch(`${API_BASE}/api/risk-assessment`);
+    const riskData = await riskResp.json();
+    renderMap(riskData.assets);
+    renderTable(riskData.assets);
+    document.getElementById('status').textContent =
+      `${riskData.hazard_count} active hazards - updated ${new Date().toLocaleTimeString()}`;
+
+    const briefingResp = await fetch(`${API_BASE}/api/briefing`);
+    const briefingData = await briefingResp.json();
+    document.getElementById('briefing-text').textContent = briefingData.briefing;
+  } catch (err) {
+    document.getElementById('status').textContent = 'Error loading data: ' + err.message;
+  }
+}
+
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
