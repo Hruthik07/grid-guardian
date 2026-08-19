@@ -10,8 +10,8 @@ Each stage below is committed and pushed to GitHub individually.
 - [x] **Stage 2 — Hazard ingestion**: NOAA/USGS/EONET fetchers + geo utilities (`backend/hazards.py`, `backend/geo.py`)
 - [x] **Stage 3 — Risk scoring engine**: proximity + severity + criticality scoring (`backend/risk.py`, `backend/assets.py`)
 - [x] **Stage 4 — LLM briefing**: Groq-hosted open-source model generates operator briefings (`backend/llm.py`)
-- [ ] **Stage 5 — API layer**: FastAPI app wiring endpoints together (`backend/main.py`)
-- [ ] **Stage 6 — Frontend dashboard**: Leaflet map + risk table + briefing panel (`frontend/index.html`)
-- [ ] **Stage 7 — Local end-to-end test**: run server, verify live data flows through to UI
+- [x] **Stage 5 — API layer**: FastAPI app wiring endpoints together (`backend/main.py`)
+- [x] **Stage 6 — Frontend dashboard**: Leaflet map + risk table + briefing panel (`frontend/index.html`)
+- [x] **Stage 7 — Local end-to-end test**: verified live NOAA/USGS/EONET data flows through risk scoring into the dashboard (real wildfire/earthquake data confirmed in screenshot)
 - [ ] **Stage 8 — Deployment**: push to GitHub, deploy on Render free tier, get public URL
 - [ ] **Stage 9 — Documentation**: final README with architecture, setup, and demo instructions
