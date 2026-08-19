@@ -1,0 +1,21 @@
+asset_id,name,type,lat,lon,criticality
+A001,SF General Hospital,hospital,37.7554,-122.4045,critical
+A002,UCSF Medical Center,hospital,37.7631,-122.4577,critical
+A003,Oakland Substation North,substation,37.8272,-122.2560,high
+A004,Kaiser Permanente Oakland,hospital,37.8085,-122.2665,critical
+A005,San Jose Data Center Hub,data_center,37.3541,-121.9552,high
+A006,Sacramento Medical Center,hospital,38.5556,-121.4689,critical
+A007,Paradise Substation,substation,39.7596,-121.6219,high
+A008,Chico Regional Hospital,hospital,39.7285,-121.8375,critical
+A009,Napa Valley Substation,substation,38.2975,-122.2869,medium
+A010,Santa Rosa Memorial Hospital,hospital,38.4404,-122.7141,critical
+A011,LA Downtown Substation,substation,34.0407,-118.2468,high
+A012,Cedars-Sinai Medical Center,hospital,34.0757,-118.3800,critical
+A013,San Diego Data Center,data_center,32.7157,-117.1611,high
+A014,Fresno Community Hospital,hospital,36.7468,-119.7726,critical
+A015,Redding Substation East,substation,40.5865,-122.3917,medium
+A016,Houston Medical District Hub,hospital,29.7099,-95.3990,critical
+A017,Galveston Coastal Substation,substation,29.3013,-94.7977,high
+A018,Miami Data Center South,data_center,25.7617,-80.1918,high
+A019,New Orleans General Hospital,hospital,29.9511,-90.0715,critical
+A020,Tampa Bay Substation,substation,27.9506,-82.4572,medium
