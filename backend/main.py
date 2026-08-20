@@ -13,6 +13,7 @@ from pydantic import BaseModel, EmailStr
 
 from backend.auth import require_org
 from backend.db import (
+    DEMO_ORG_TOKEN,
     add_asset,
     add_subscriber,
     create_organization,
@@ -79,8 +80,17 @@ async def register_org(req: OrgRegisterRequest):
     }
 
 
+def _reject_demo_writes(org: dict) -> None:
+    if org["token"] == DEMO_ORG_TOKEN:
+        raise HTTPException(
+            status_code=403,
+            detail="The shared demo org is read-only. Register your own organization to add assets or subscribers.",
+        )
+
+
 @app.post("/api/register")
 async def register(req: RegisterRequest, org: dict = Depends(require_org)):
+    _reject_demo_writes(org)
     coords = await geocode_address(req.address)
     if coords is None:
         raise HTTPException(status_code=400, detail="Could not geocode that address")
@@ -101,6 +111,7 @@ async def get_assets(org: dict = Depends(require_org)):
 
 @app.post("/api/assets")
 async def create_asset(req: AssetRequest, org: dict = Depends(require_org)):
+    _reject_demo_writes(org)
     coords = await geocode_address(req.address)
     if coords is None:
         raise HTTPException(status_code=400, detail="Could not geocode that address")

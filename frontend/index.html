@@ -153,8 +153,8 @@
   <div style="display:flex; align-items:center; gap:12px;">
     <span id="org-name-label"></span>
     <span id="status">Loading live hazard data…</span>
-    <button onclick="toggleAsset()">Add Asset</button>
-    <button onclick="toggleRegister()">Get Alerts For My Location</button>
+    <button id="add-asset-btn" onclick="toggleAsset()">Add Asset</button>
+    <button id="get-alerts-btn" onclick="toggleRegister()">Get Alerts For My Location</button>
     <button onclick="loadAll()">Refresh</button>
     <button class="secondary" onclick="signOut()">Switch Org</button>
   </div>
@@ -235,12 +235,20 @@ function orgHeaders() {
   return { 'X-Org-Token': localStorage.getItem('gg_org_token') || '' };
 }
 
+const DEMO_ORG_TOKEN = 'demo-token';
+
 function enterApp(token, name) {
   localStorage.setItem('gg_org_token', token);
   if (name) localStorage.setItem('gg_org_name', name);
   document.getElementById('org-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('org-name-label').textContent = localStorage.getItem('gg_org_name') || '';
+  const isDemo = token === DEMO_ORG_TOKEN;
+  document.getElementById('add-asset-btn').style.display = isDemo ? 'none' : '';
+  document.getElementById('get-alerts-btn').style.display = isDemo ? 'none' : '';
+  if (isDemo) {
+    document.getElementById('org-name-label').textContent += ' (read-only demo)';
+  }
   if (!map) initMap();
   loadAll();
   setInterval(loadAll, 5 * 60 * 1000);
