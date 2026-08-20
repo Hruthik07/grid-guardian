@@ -5,10 +5,17 @@ import os
 
 import httpx
 
-from backend.assets import CRITICALITY_WEIGHT
-from backend.db import has_been_notified, list_subscribers, mark_notified
+from backend.db import (
+    has_been_notified,
+    list_assets,
+    list_organizations,
+    list_subscribers,
+    log_incident,
+    mark_notified,
+)
 from backend.hazards import fetch_all_hazards
 from backend.risk import score_assets
+from backend.sms import send_sms
 
 logger = logging.getLogger("grid_guardian.notify")
 
@@ -17,12 +24,9 @@ POLL_INTERVAL_SECONDS = 5 * 60
 FROM_ADDRESS = "Grid Guardian <alerts@resend.dev>"
 
 
-def _hazard_key(hazard: dict) -> str:
-    raw = f"{hazard['source']}|{hazard['event_type']}|{hazard['headline']}|{hazard.get('effective', '')}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
-
-
 def _subscribers_as_assets(subscribers: list[dict]) -> list[dict]:
+    from backend.db import CRITICALITY_WEIGHT
+
     assets = []
     for s in subscribers:
         assets.append({
@@ -54,39 +58,64 @@ async def _send_email(client: httpx.AsyncClient, to_email: str, subject: str, bo
         logger.error("Failed to send email to %s: %s", to_email, exc)
 
 
+async def _process_org(client: httpx.AsyncClient, org: dict, hazards: list[dict]) -> int:
+    org_id = org["id"]
+    assets = list_assets(org_id)
+    subscribers = list_subscribers(org_id)
+    subscriber_assets = _subscribers_as_assets(subscribers)
+    subscribers_by_asset_id = {f"sub-{s['id']}": s for s in subscribers}
+
+    scored = score_assets(assets + subscriber_assets, hazards)
+    sent = 0
+
+    for scored_asset in scored:
+        if scored_asset["risk_score"] <= 0:
+            continue
+        is_subscriber = scored_asset["asset_id"].startswith("sub-")
+        target_type = "subscriber" if is_subscriber else "asset"
+        target_id = int(scored_asset["asset_id"].split("-")[1])
+
+        for hit in scored_asset["hazards"]:
+            is_new = log_incident(
+                org_id, target_type, target_id, scored_asset["name"], hit,
+                scored_asset["risk_score"], hit["contribution"], notified=is_subscriber,
+            )
+            if not is_new or not is_subscriber:
+                continue
+
+            subscriber = subscribers_by_asset_id[scored_asset["asset_id"]]
+            hazard_key = hashlib.sha256(
+                f"{hit['source']}|{hit['event_type']}|{hit['headline']}".encode()
+            ).hexdigest()[:16]
+            if has_been_notified(subscriber["id"], hazard_key):
+                continue
+
+            subject = f"Grid Guardian Alert: {hit['event_type']} near {subscriber['address']}"
+            body = (
+                f"Hi {subscriber['name']},\n\n"
+                f"A {hit['event_type']} ({hit['severity']}) has been detected near your registered "
+                f"location ({subscriber['address']}).\n\nDetails: {hit['headline']}\nSource: {hit['source']}"
+                "\n\n— Grid Guardian"
+            )
+            await _send_email(client, subscriber["email"], subject, body)
+            if subscriber.get("phone"):
+                send_sms(subscriber["phone"], f"Grid Guardian: {hit['event_type']} ({hit['severity']}) near {subscriber['address']}. {hit['headline']}")
+            mark_notified(subscriber["id"], hazard_key)
+            sent += 1
+
+    return sent
+
+
 async def check_and_notify_once() -> int:
-    subscribers = list_subscribers()
-    if not subscribers:
+    orgs = list_organizations()
+    if not orgs:
         return 0
     hazards = await fetch_all_hazards()
-    assets = _subscribers_as_assets(subscribers)
-    scored = score_assets(assets, hazards)
-    scored_by_id = {a["asset_id"]: a for a in scored}
-
-    sent = 0
+    total_sent = 0
     async with httpx.AsyncClient() as client:
-        for s in subscribers:
-            scored_asset = scored_by_id.get(f"sub-{s['id']}")
-            if not scored_asset or scored_asset["risk_score"] <= 0:
-                continue
-            for hazard_hit in scored_asset["hazards"]:
-                key = f"{hazard_hit['source']}|{hazard_hit['event_type']}|{hazard_hit['headline']}"
-                key_hash = hashlib.sha256(key.encode()).hexdigest()[:16]
-                if has_been_notified(s["id"], key_hash):
-                    continue
-                subject = f"Grid Guardian Alert: {hazard_hit['event_type']} near {s['address']}"
-                body = (
-                    f"Hi {s['name']},\n\n"
-                    f"A {hazard_hit['event_type']} ({hazard_hit['severity']}) has been detected near your "
-                    f"registered location ({s['address']}).\n\n"
-                    f"Details: {hazard_hit['headline']}\n"
-                    f"Source: {hazard_hit['source']}\n\n"
-                    "— Grid Guardian"
-                )
-                await _send_email(client, s["email"], subject, body)
-                mark_notified(s["id"], key_hash)
-                sent += 1
-    return sent
+        for org in orgs:
+            total_sent += await _process_org(client, org, hazards)
+    return total_sent
 
 
 async def start_poller() -> None:
@@ -94,7 +123,7 @@ async def start_poller() -> None:
         try:
             sent = await check_and_notify_once()
             if sent:
-                logger.info("Sent %d hazard alert email(s)", sent)
+                logger.info("Sent %d hazard alert notification(s)", sent)
         except Exception:
             logger.exception("Error during hazard poll cycle")
         await asyncio.sleep(POLL_INTERVAL_SECONDS)

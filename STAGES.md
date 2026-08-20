@@ -14,5 +14,8 @@ Each stage below is committed and pushed to GitHub individually.
 - [x] **Stage 6 — Frontend dashboard**: Leaflet map + risk table + briefing panel (`frontend/index.html`)
 - [x] **Stage 7 — Local end-to-end test**: verified live NOAA/USGS/EONET data flows through risk scoring into the dashboard (real wildfire/earthquake data confirmed in screenshot)
 - [x] **Stage 7.5 — Registration + proactive alerting**: signup form geocodes an address into a monitored subscriber (`backend/db.py`, `backend/geocode.py`), background poller (`backend/notify.py`) checks live hazards every 5 min and emails subscribers via Resend when a hazard intersects their location, deduped per hazard occurrence. Verified live: registered a real address, confirmed real email delivery via Resend.
-- [ ] **Stage 8 — Deployment**: push to GitHub, deploy on Render free tier, get public URL
-- [ ] **Stage 9 — Documentation**: final README with architecture, setup, and demo instructions
+- [x] **Stage 8 — Multi-tenant customer accounts**: organizations table with opaque bearer tokens (`X-Org-Token`), private per-org asset portfolios and subscriber lists, org self-registration + sign-in flow in the frontend (`backend/db.py`, `backend/auth.py`, `backend/main.py`). Verified: new org starts with an empty portfolio, fully isolated from the demo org's 20 assets.
+- [x] **Stage 9 — Incident audit log**: every new hazard-to-asset/subscriber match is persisted (deduped) with a detection timestamp, notified flag, and full hazard context (`backend/db.py: log_incident`, `backend/notify.py`). Exposed via `/api/incidents` and rendered as a timeline in the dashboard. Verified: populated automatically by the background poller with real live wildfire/earthquake incidents.
+- [ ] **Stage 10 — SMS alerts**: Twilio integration for time-critical hazards (subscriber phone field already added; `backend/sms.py` written, pending Twilio credentials)
+- [ ] **Stage 11 — Deployment**: push to GitHub, deploy on Render free tier, get public URL
+- [ ] **Stage 12 — Documentation**: final README with architecture, setup, and demo instructions

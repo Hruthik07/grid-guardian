@@ -35,6 +35,7 @@
   header h1 { font-size: 18px; margin: 0; }
   header h1 span { color: var(--accent); }
   #status { font-size: 12px; color: var(--muted); }
+  #org-name { font-size: 12px; color: var(--muted); margin-right: 8px; }
   #layout {
     display: grid;
     grid-template-columns: 1.3fr 1fr;
@@ -51,23 +52,22 @@
   }
   #briefing h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
   #briefing-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
-  #table-wrap {
+  #table-wrap, #incidents-wrap {
     grid-column: 1 / 3;
     background: var(--panel);
     padding: 16px 20px;
   }
-  #table-wrap h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  #table-wrap h2, #incidents-wrap h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 500; }
-  .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
   .risk-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; width: 100px; }
   .risk-bar-fill { height: 100%; }
   .crit-critical { color: var(--critical); }
   .crit-high { color: var(--high); }
   .crit-medium { color: var(--medium); }
   .crit-low { color: var(--low); }
-  #refresh-btn, #register-btn, #register-toggle-btn {
+  button {
     background: var(--accent);
     color: #05131f;
     border: none;
@@ -77,16 +77,17 @@
     font-weight: 600;
     cursor: pointer;
   }
-  #register-panel {
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .panel-toggle {
     background: var(--panel);
     padding: 16px 20px;
     border-bottom: 1px solid var(--border);
     display: none;
   }
-  #register-panel.open { display: block; }
-  #register-panel h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
-  #register-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  #register-form input, #register-form select {
+  .panel-toggle.open { display: block; }
+  .panel-toggle h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
+  .inline-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .inline-form input, .inline-form select {
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
@@ -94,39 +95,108 @@
     border-radius: 6px;
     font-size: 13px;
   }
-  #register-form input[name="name"] { width: 140px; }
-  #register-form input[name="email"] { width: 180px; }
-  #register-form input[name="address"] { width: 280px; }
-  #register-msg { font-size: 12px; margin-top: 8px; color: var(--muted); }
+  .inline-form input[name="name"] { width: 140px; }
+  .inline-form input[name="email"] { width: 180px; }
+  .inline-form input[name="phone"] { width: 130px; }
+  .inline-form input[name="address"] { width: 260px; }
+  .form-msg { font-size: 12px; margin-top: 8px; color: var(--muted); }
   .leaflet-popup-content-wrapper { background: var(--panel); color: var(--text); }
   .leaflet-popup-tip { background: var(--panel); }
+
+  #org-gate {
+    max-width: 480px;
+    margin: 80px auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+  }
+  #org-gate h1 { font-size: 20px; margin-top: 0; }
+  #org-gate p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  #org-gate .row { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  #org-gate input {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 10px; border-radius: 6px; font-size: 13px;
+  }
+  #org-gate hr { border-color: var(--border); margin: 20px 0; }
+  #app { display: none; }
 </style>
 </head>
 <body>
 
+<div id="org-gate">
+  <h1>Grid <span style="color:var(--accent);">Guardian</span></h1>
+  <p>Real-time critical infrastructure risk monitor. Every organization gets its own private asset portfolio.</p>
+
+  <button onclick="useDemoOrg()">View the shared demo portfolio</button>
+
+  <hr/>
+  <p><b>Register your organization</b> to get your own private asset list and alerting.</p>
+  <div class="row">
+    <input id="org-name" placeholder="Organization name" />
+    <input id="org-email" placeholder="Contact email" />
+    <button onclick="registerOrg()">Create organization</button>
+  </div>
+
+  <hr/>
+  <p>Already have an org token?</p>
+  <div class="row">
+    <input id="org-token-input" placeholder="Paste your X-Org-Token" />
+    <button class="secondary" onclick="useTokenInput()">Sign in</button>
+  </div>
+  <div class="form-msg" id="org-gate-msg"></div>
+</div>
+
+<div id="app">
 <header>
   <h1>Grid <span>Guardian</span> — Critical Infrastructure Risk Monitor</h1>
   <div style="display:flex; align-items:center; gap:12px;">
+    <span id="org-name-label"></span>
     <span id="status">Loading live hazard data…</span>
-    <button id="register-toggle-btn" onclick="toggleRegister()">Get Alerts For My Location</button>
-    <button id="refresh-btn" onclick="loadAll()">Refresh</button>
+    <button onclick="toggleAsset()">Add Asset</button>
+    <button onclick="toggleRegister()">Get Alerts For My Location</button>
+    <button onclick="loadAll()">Refresh</button>
+    <button class="secondary" onclick="signOut()">Switch Org</button>
   </div>
 </header>
 
-<div id="register-panel">
-  <h2>Register for hazard email alerts</h2>
-  <form id="register-form" onsubmit="submitRegister(event)">
+<div id="asset-panel" class="panel-toggle">
+  <h2>Add an asset to your portfolio</h2>
+  <form class="inline-form" onsubmit="submitAsset(event)">
+    <input type="text" name="name" placeholder="Asset name" required />
+    <select name="type">
+      <option value="hospital">Hospital</option>
+      <option value="substation">Substation</option>
+      <option value="data_center">Data center</option>
+      <option value="warehouse">Warehouse</option>
+      <option value="other">Other</option>
+    </select>
+    <input type="text" name="address" placeholder="Street address, city, state, zip" required />
+    <select name="criticality">
+      <option value="critical">Critical</option>
+      <option value="high" selected>High</option>
+      <option value="medium">Medium</option>
+    </select>
+    <button type="submit">Add</button>
+  </form>
+  <div id="asset-msg" class="form-msg"></div>
+</div>
+
+<div id="register-panel" class="panel-toggle">
+  <h2>Register for hazard alerts (email + optional SMS)</h2>
+  <form class="inline-form" onsubmit="submitRegister(event)">
     <input type="text" name="name" placeholder="Your name" required />
     <input type="email" name="email" placeholder="Email address" required />
+    <input type="tel" name="phone" placeholder="Phone (optional, for SMS)" />
     <input type="text" name="address" placeholder="Street address, city, state, zip" required />
     <select name="criticality">
       <option value="high">High priority</option>
       <option value="critical">Critical (hospital/emergency-dependent)</option>
       <option value="medium">Medium priority</option>
     </select>
-    <button id="register-btn" type="submit">Register</button>
+    <button type="submit">Register</button>
   </form>
-  <div id="register-msg"></div>
+  <div id="register-msg" class="form-msg"></div>
 </div>
 
 <div id="layout">
@@ -144,18 +214,82 @@
       <tbody id="risk-tbody"></tbody>
     </table>
   </div>
+  <div id="incidents-wrap">
+    <h2>Incident Log</h2>
+    <table>
+      <thead>
+        <tr><th>Detected</th><th>Target</th><th>Hazard</th><th>Severity</th><th>Risk contribution</th><th>Notified</th></tr>
+      </thead>
+      <tbody id="incidents-tbody"></tbody>
+    </table>
+  </div>
+</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const API_BASE = "";
-const map = L.map('map', { zoomControl: true }).setView([36.5, -100], 4);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap &copy; CARTO',
-  maxZoom: 19,
-}).addTo(map);
+let map, markers = [];
 
-let markers = [];
+function orgHeaders() {
+  return { 'X-Org-Token': localStorage.getItem('gg_org_token') || '' };
+}
+
+function enterApp(token, name) {
+  localStorage.setItem('gg_org_token', token);
+  if (name) localStorage.setItem('gg_org_name', name);
+  document.getElementById('org-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('org-name-label').textContent = localStorage.getItem('gg_org_name') || '';
+  if (!map) initMap();
+  loadAll();
+  setInterval(loadAll, 5 * 60 * 1000);
+}
+
+function useDemoOrg() {
+  enterApp('demo-token', 'Grid Guardian Demo Org');
+}
+
+function useTokenInput() {
+  const token = document.getElementById('org-token-input').value.trim();
+  if (!token) return;
+  enterApp(token, 'Your Organization');
+}
+
+async function registerOrg() {
+  const name = document.getElementById('org-name').value.trim();
+  const email = document.getElementById('org-email').value.trim();
+  const msg = document.getElementById('org-gate-msg');
+  if (!name || !email) { msg.textContent = 'Enter an organization name and email.'; return; }
+  msg.textContent = 'Creating organization…';
+  try {
+    const resp = await fetch(`${API_BASE}/api/orgs/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Registration failed');
+    alert(`Organization created! Save this token — you need it to sign back in:\n\n${data.token}`);
+    enterApp(data.token, name);
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+  }
+}
+
+function signOut() {
+  localStorage.removeItem('gg_org_token');
+  localStorage.removeItem('gg_org_name');
+  location.reload();
+}
+
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([36.5, -100], 4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    maxZoom: 19,
+  }).addTo(map);
+}
 
 function riskColor(score) {
   if (score >= 0.5) return '#ff4d4f';
@@ -212,19 +346,42 @@ function renderTable(assets) {
   });
 }
 
+function renderIncidents(incidents) {
+  const tbody = document.getElementById('incidents-tbody');
+  tbody.innerHTML = '';
+  incidents.forEach(i => {
+    const tr = document.createElement('tr');
+    const detected = new Date(i.detected_at + 'Z').toLocaleString();
+    tr.innerHTML = `
+      <td style="color:#8b98a5; font-size:12px;">${detected}</td>
+      <td>${i.target_name} <span style="color:#8b98a5;">(${i.target_type})</span></td>
+      <td>${i.event_type} — <span style="color:#8b98a5;">${i.headline}</span></td>
+      <td>${i.severity}</td>
+      <td>${i.contribution.toFixed(3)}</td>
+      <td>${i.notified ? 'Yes' : 'No'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 async function loadAll() {
   document.getElementById('status').textContent = 'Refreshing…';
   try {
-    const riskResp = await fetch(`${API_BASE}/api/risk-assessment`);
+    const riskResp = await fetch(`${API_BASE}/api/risk-assessment`, { headers: orgHeaders() });
+    if (riskResp.status === 401) { signOut(); return; }
     const riskData = await riskResp.json();
     renderMap(riskData.assets);
     renderTable(riskData.assets);
     document.getElementById('status').textContent =
       `${riskData.hazard_count} active hazards - updated ${new Date().toLocaleTimeString()}`;
 
-    const briefingResp = await fetch(`${API_BASE}/api/briefing`);
+    const briefingResp = await fetch(`${API_BASE}/api/briefing`, { headers: orgHeaders() });
     const briefingData = await briefingResp.json();
     document.getElementById('briefing-text').textContent = briefingData.briefing;
+
+    const incidentsResp = await fetch(`${API_BASE}/api/incidents`, { headers: orgHeaders() });
+    const incidentsData = await incidentsResp.json();
+    renderIncidents(incidentsData);
   } catch (err) {
     document.getElementById('status').textContent = 'Error loading data: ' + err.message;
   }
@@ -232,6 +389,10 @@ async function loadAll() {
 
 function toggleRegister() {
   document.getElementById('register-panel').classList.toggle('open');
+}
+
+function toggleAsset() {
+  document.getElementById('asset-panel').classList.toggle('open');
 }
 
 async function submitRegister(evt) {
@@ -242,26 +403,54 @@ async function submitRegister(evt) {
   const payload = {
     name: form.name.value,
     email: form.email.value,
+    phone: form.phone.value || null,
     address: form.address.value,
     criticality: form.criticality.value,
   };
   try {
     const resp = await fetch(`${API_BASE}/api/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...orgHeaders() },
       body: JSON.stringify(payload),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.detail || 'Registration failed');
-    msg.textContent = `Registered! We'll email ${payload.email} if a hazard is detected near ${payload.address}.`;
+    msg.textContent = `Registered! We'll alert ${payload.email} if a hazard is detected near ${payload.address}.`;
     form.reset();
   } catch (err) {
     msg.textContent = 'Error: ' + err.message;
   }
 }
 
-loadAll();
-setInterval(loadAll, 5 * 60 * 1000);
+async function submitAsset(evt) {
+  evt.preventDefault();
+  const form = evt.target;
+  const msg = document.getElementById('asset-msg');
+  msg.textContent = 'Adding…';
+  const payload = {
+    name: form.name.value,
+    type: form.type.value,
+    address: form.address.value,
+    criticality: form.criticality.value,
+  };
+  try {
+    const resp = await fetch(`${API_BASE}/api/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...orgHeaders() },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Failed to add asset');
+    msg.textContent = `Added ${payload.name} to your portfolio.`;
+    form.reset();
+    loadAll();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+  }
+}
+
+const savedToken = localStorage.getItem('gg_org_token');
+if (savedToken) enterApp(savedToken, localStorage.getItem('gg_org_name'));
 </script>
 </body>
 </html>
