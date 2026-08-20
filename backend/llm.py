@@ -2,7 +2,7 @@ import os
 
 from groq import Groq
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-120b"
 
 
 def generate_briefing(scored_assets: list[dict]) -> str:
@@ -36,7 +36,7 @@ def generate_briefing(scored_assets: list[dict]) -> str:
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=500,
+            max_tokens=1500,
         )
         return resp.choices[0].message.content.strip()
     except Exception as exc:  # noqa: BLE001
